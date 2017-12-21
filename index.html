@@ -80,7 +80,8 @@
           {label: 'Total Value', value: total_value.toFixed(2)},
           {label: 'Money', value: money.toFixed(2)},
           {label: 'Portfolio Value', value: portfolio_value.toFixed(2)},
-          {label: 'Price', value: price.toFixed(2)},
+          {label: 'Portfolio Profit', value: (money - settingsPanel.getValue("start_money")).toFixed(2)},
+          {label: 'Final Price', value: price.toFixed(2)},
           {label: 'Day', value: days}
         ]
         data.forEach(function(element) {
@@ -107,23 +108,30 @@
           return Math.random() * (max - min) + min;
       };
 
-      function dailyPriceAdjustment(price, yearly_interest) {
+      function dailyPriceAdjustment(day, price, yearly_interest) {
         let dailyFluctuation = price * 0.05 + 0.1;
-        let dailyIncrease = yearly_interest ** (1/365);
+        let dailyIncrease = yearly_interest ** (1/365) - 1;
 
         if(times_crashed > 0){
           dailyIncrease = 0;
         }
 
-        let min_increase = -0.5 * dailyFluctuation + (price * (dailyIncrease-1));
-        let max_increase = 0.5 * dailyFluctuation + (price * (dailyIncrease-1));
+        let min_increase = -0.5 * dailyFluctuation + (price * dailyIncrease);
+        let max_increase = 0.5 * dailyFluctuation + (price * dailyIncrease);
+        if (day > 190) {
+          console.log((price * (dailyIncrease-1)))
+          console.log(min_increase)
+          console.log(max_increase)
+          console.log(generateRandomNumber(min_increase, max_increase))
+          console.log('')
+        }
 
         price += generateRandomNumber(min_increase, max_increase);
         if(price < 0) {
           price = 0;
         }
 
-        if(times_run > 4 && times_crashed < 1 && Math.random() < 0.001){
+        if(times_crashed < 1 && day == settingsPanel.getValue("price_crash_at_day")){
           times_crashed += 1;
           price = price / 5;
         }
@@ -137,7 +145,7 @@
         let prices = [];
 
         for (i = 0; i < days; i++) {
-          price = dailyPriceAdjustment(price, yearly_interest, times_crashed);
+          price = dailyPriceAdjustment(i, price, yearly_interest, times_crashed);
           prices.push(price);
         }
         return prices;
@@ -146,11 +154,13 @@
       function calculate_data(id, prices, max_portfolio_percentage){
         let days = settingsPanel.getValue("days");
 
-        let amount = settingsPanel.getValue("amount");
-        let money = settingsPanel.getValue("money");
+        let amount = settingsPanel.getValue("start_amount");
+        let start_money = settingsPanel.getValue("start_money")
+        let money = start_money;
         let price = prices[0];
         let portfolio_value = price * amount;
         let total_value = portfolio_value + money;
+        let portfolio_profit = 0;
 
         let max_overflow_percentage = 20;
 
@@ -160,6 +170,7 @@
 
           portfolio_value = price * amount;
           total_value = portfolio_value + money;
+          portfolio_profit = money - start_money;
 
           let max_portfolio_value = (max_portfolio_percentage/100) * total_value;
           let diff = portfolio_value - max_portfolio_value * (1+max_overflow_percentage/100);
@@ -171,9 +182,10 @@
 
           if((i % 10 == 0 && days < 500) || i % 20 == 0){
             data.push({'Day': i, 'Value': price, 'Metric': 'Price'});
-            data.push({'Day': i, 'Value': money, 'Metric': 'Money - strategy ' + id});
-            data.push({'Day': i, 'Value': portfolio_value, 'Metric': 'Portfolio - strategy ' + id});
-            data.push({'Day': i, 'Value': total_value, 'Metric': 'Total - strategy ' + id});
+            //data.push({'Day': i, 'Value': money, 'Metric': 'Money - strategy ' + id});
+            data.push({'Day': i, 'Value': portfolio_value, 'Metric': 'Portfolio Value - strategy ' + id});
+            data.push({'Day': i, 'Value': portfolio_profit, 'Metric': 'Portfolio Profit - strategy ' + id});
+            //data.push({'Day': i, 'Value': total_value, 'Metric': 'Total - strategy ' + id});
           }
         }
 
@@ -203,9 +215,11 @@
         settingsPanel.setKey("h");
         settingsPanel.setGlobalChangeHandler(runDelayed);
         settingsPanel.addRange("days", 1, 365*2, 365, 1);
-        settingsPanel.addRange("amount", 1, 10, 1, 1);
+        settingsPanel.addRange("start_amount", 1, 10, 1, 1);
         settingsPanel.addRange("start_price", 1, 10, 1, 1);
-        settingsPanel.addRange("money", 1, 500, 9, 1);
+        settingsPanel.addRange("start_money", 1, 500, 9, 1);
+
+        settingsPanel.addRange("price_crash_at_day", -1, 365*2, -1, 1);
 
         settingsPanel.addRange("max_portfolio_percentage1", 1, 100, 20, 1);
         settingsPanel.addRange("max_portfolio_percentage2", 1, 100, 20, 1);
