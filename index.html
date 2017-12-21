@@ -133,21 +133,33 @@
         return price;
       }
 
-      function calculate_data(id, max_portfolio_percentage){
+      function calculate_prices(){
         let days = settingsPanel.getValue("days");
         let price = settingsPanel.getValue("start_price");
+        let yearly_interest = 10; // times (e.g. 3 -> 3x value in one year)
+        let prices = [];
+
+        for (i = 0; i < days; i++) {
+          price = dailyPriceAdjustment(price, yearly_interest, times_crashed);
+          prices.push(price);
+        }
+        return prices;
+      }
+
+      function calculate_data(id, prices, max_portfolio_percentage){
+        let days = settingsPanel.getValue("days");
 
         let amount = settingsPanel.getValue("amount");
         let money = settingsPanel.getValue("money");
+        let price = prices[0];
         let portfolio_value = price * amount;
         let total_value = portfolio_value + money;
 
-        let yearly_interest = 10; // times (e.g. 3 -> 3x value in one year)
         let max_overflow_percentage = 20;
 
         let data = [];
         for (i = 0; i < days; i++) {
-          price = dailyPriceAdjustment(price, yearly_interest, times_crashed);
+          price = prices[i];
 
           portfolio_value = price * amount;
           total_value = portfolio_value + money;
@@ -176,8 +188,9 @@
 
       function run(){
         times_crashed = 0;
-        let data = calculate_data('1', settingsPanel.getValue("max_portfolio_percentage1"));
-        data = data.concat(calculate_data('2', settingsPanel.getValue("max_portfolio_percentage2")));
+        let prices = calculate_prices();
+        let data = calculate_data('1', prices, settingsPanel.getValue("max_portfolio_percentage1"));
+        data = data.concat(calculate_data('2', prices, settingsPanel.getValue("max_portfolio_percentage2")));
 
         renderGraph(data, 'chartContainer');
         times_run += 1;
