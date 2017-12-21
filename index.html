@@ -2,118 +2,162 @@
 <html>
   <head>
     <meta charset="UTF-8">
+
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+
     <title></title>
   </head>
   <body>
+    <div class="container">
+      <div class="row">
+        <div id="chartContainer1" style="margin-top: 25px; margin-left:70px;" class="col-4"></div>
+        <div style="margin: 50px; margin-left:100px;">
+          <h4>Final value</h4>
+          <table class="table table-bordered" style="width: 500px;" class="col-4">
+            <tbody id="table1">
+            </tbody>
+          </table>
+        </div>
+      </div>
 
-    <div id="chartContainer" style="margin-top: 300px;">
+      <div class="row">
+        <div id="chartContainer2" style="margin-top: 25px; margin-left:70px;"></div>
+        <div style="margin: 50px; margin-left:100px;">
+          <h4>Final value</h4>
+          <table class="table table-bordered" style="width: 400px;">
+            <tbody id="table2">
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
-  <script src="https://cdn.jsdelivr.net/quicksettings/latest/quicksettings.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/4.12.0/d3.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/dimple/2.3.0/dimple.latest.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/quicksettings/latest/quicksettings.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/4.12.0/d3.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dimple/2.3.0/dimple.latest.min.js"></script>
 
-  <script type="text/javascript">
-    let settingsPanel;
-    let reinitDelayId;
+    <script type="text/javascript">
+      let settingsPanel;
+      let reinitDelayId;
 
-    function renderGraph(data){
-      document.getElementById('chartContainer').innerHTML = "";
-      var svg = dimple.newSvg("#chartContainer", 590, 400);
+      function renderGraph(data, container_id){
+        document.getElementById(container_id).innerHTML = "";
+        var svg = dimple.newSvg('#' + container_id, 500, 400);
 
-      var myChart = new dimple.chart(svg, data);
-      myChart.setBounds(60, 30, 505, 305);
-      myChart.addCategoryAxis("x", "Day");
-      myChart.addMeasureAxis("y", "Value");
-      myChart.addLegend(100, 0, 60, 200, "Right");
+        var myChart = new dimple.chart(svg, data);
+        myChart.setBounds(60, 30, 505, 305);
+        myChart.addCategoryAxis("x", "Day");
+        myChart.addMeasureAxis("y", "Value");
+        myChart.addLegend(100, 6, 60, 200, "Right");
 
-      var s = myChart.addSeries("Metric", dimple.plot.line);
-      s.getTooltipText = function (e) {
-        return [
-          'Day: ' + e.x,
-          e.aggField[0] + ': ' + e.y.toFixed(2)];
-      }
-
-      myChart.draw();
-    }
-
-    function generateRandomNumber(min, max){
-        return Math.random() * (max - min) + min;
-    };
-
-    function dailyPriceAdjuctMent(price, yearly_interest) {
-      let dailyFluctuation = price * 0.05 * 0;
-      let dailyIncrease = yearly_interest ** (1/365);
-
-      let min_increase = -0.5 * dailyFluctuation + (price * (dailyIncrease-1));
-      let max_increase = 0.5 * dailyFluctuation + (price * (dailyIncrease-1));
-
-      price += generateRandomNumber(min_increase, max_increase);
-      return price;
-    }
-
-    function run(){
-      let days = settingsPanel.getValue("days");
-      let amount = settingsPanel.getValue("amount");
-      let money = settingsPanel.getValue("money");
-      let price = settingsPanel.getValue("start_price");
-      let max_portfolio_percentage = settingsPanel.getValue("max_portfolio_percentage");
-
-      let yearly_interest = 10; // times (e.g. 3 -> 3x value in one year)
-      let max_overflow_percentage = 20;
-
-      let portfolio_value = price * amount;
-      let total_value = portfolio_value + money;
-
-      let data = [];
-      for (i = 0; i < days; i++) {
-        price = dailyPriceAdjuctMent(price, yearly_interest);
-
-        portfolio_value = price * amount;
-        total_value = portfolio_value + money;
-
-        let max_portfolio_value = (max_portfolio_percentage/100) * total_value;
-        let diff = portfolio_value - max_portfolio_value * (1+max_overflow_percentage/100);
-        if(diff > 0){
-          let sale_amount = (portfolio_value - max_portfolio_value) / price;
-          amount = amount - sale_amount;
-          money = money + sale_amount * price;
+        var s = myChart.addSeries("Metric", dimple.plot.line);
+        s.getTooltipText = function (e) {
+          return [
+            'Day: ' + e.x,
+            e.aggField[0] + ': ' + e.y.toFixed(2)];
         }
 
-      if((i % 10 == 0 && days < 500) || i % 20 == 0){
-        data.push({'Day': i, 'Value': price, 'Metric': 'Price'});
-        data.push({'Day': i, 'Value': money, 'Metric': 'Money'});
-        data.push({'Day': i, 'Value': portfolio_value, 'Metric': 'Portfolio'});
-        data.push({'Day': i, 'Value': total_value, 'Metric': 'Total'});
+        myChart.draw();
       }
 
+      function renderTable(price, money, portfolio_value, total_value, days, container_id){
+        let html = '';
+        let data = [
+          {label: 'Day', value: days},
+          {label: 'Price', value: price.toFixed(2)},
+          {label: 'Money', value: money.toFixed(2)},
+          {label: 'Portfolio Value', value: portfolio_value.toFixed(2)},
+          {label: 'Total Value', value: total_value.toFixed(2)},
+        ]
+        data.forEach(function(element) {
+          html += '<tr><td>'+element.label+'</td><td>'+element.value+'</td></tr>'
+        });
+        document.getElementById(container_id).innerHTML = html;
+
+      }
+
+      function generateRandomNumber(min, max){
+          return Math.random() * (max - min) + min;
+      };
+
+      function dailyPriceAdjuctMent(price, yearly_interest) {
+        let dailyFluctuation = price * 0.05 * 0;
+        let dailyIncrease = yearly_interest ** (1/365);
+
+        let min_increase = -0.5 * dailyFluctuation + (price * (dailyIncrease-1));
+        let max_increase = 0.5 * dailyFluctuation + (price * (dailyIncrease-1));
+
+        price += generateRandomNumber(min_increase, max_increase);
+        return price;
+      }
+
+      function run(){
+        let days = settingsPanel.getValue("days");
+        let amount = settingsPanel.getValue("amount");
+        let money = settingsPanel.getValue("money");
+        let price = settingsPanel.getValue("start_price");
+        let max_portfolio_percentage = settingsPanel.getValue("max_portfolio_percentage");
+
+        let yearly_interest = 10; // times (e.g. 3 -> 3x value in one year)
+        let max_overflow_percentage = 20;
+
+        let portfolio_value = price * amount;
+        let total_value = portfolio_value + money;
+
+        let data = [];
+        for (i = 0; i < days; i++) {
+          price = dailyPriceAdjuctMent(price, yearly_interest);
+
+          portfolio_value = price * amount;
+          total_value = portfolio_value + money;
+
+          let max_portfolio_value = (max_portfolio_percentage/100) * total_value;
+          let diff = portfolio_value - max_portfolio_value * (1+max_overflow_percentage/100);
+          if(diff > 0){
+            let sale_amount = (portfolio_value - max_portfolio_value) / price;
+            amount = amount - sale_amount;
+            money = money + sale_amount * price;
+          }
+
+        if((i % 10 == 0 && days < 500) || i % 20 == 0){
+          data.push({'Day': i, 'Value': price, 'Metric': 'Price'});
+          data.push({'Day': i, 'Value': money, 'Metric': 'Money'});
+          data.push({'Day': i, 'Value': portfolio_value, 'Metric': 'Portfolio'});
+          data.push({'Day': i, 'Value': total_value, 'Metric': 'Total'});
+        }
+      }
+
+      renderTable(price, money, portfolio_value, total_value, days, 'table1');
+      renderGraph(data, 'chartContainer1');
+
+      renderTable(price, money, portfolio_value, total_value, days, 'table2');
+      renderGraph(data, 'chartContainer2');
     }
 
-    renderGraph(data);
-  }
+    function runDelayed() {
+        clearTimeout(reinitDelayId);
+        reinitDelayId = setTimeout(run, 200);
+    }
 
-  function runDelayed() {
-      clearTimeout(reinitDelayId);
-      reinitDelayId = setTimeout(run, 200);
-  }
+    function main(){
+      settingsPanel = QuickSettings.create(0, 0, "Settings (h to hide)");
+      settingsPanel.setKey("h");
+      settingsPanel.setGlobalChangeHandler(runDelayed);
+      settingsPanel.addRange("days", 1, 365*2, 365, 1);
+      settingsPanel.addRange("amount", 1, 10, 1, 1);
+      settingsPanel.addRange("start_price", 1, 10, 1, 1);
+      settingsPanel.addRange("money", 1, 500, 9, 1);
+      settingsPanel.addRange("max_portfolio_percentage", 1, 100, 20, 1);
+      settingsPanel.saveInLocalStorage("SETTINGS_STORAGE");
 
-  function main(){
-    settingsPanel = QuickSettings.create(0, 0, "Settings (h to hide)");
-    settingsPanel.setKey("h");
-    settingsPanel.setGlobalChangeHandler(runDelayed);
-    settingsPanel.addRange("days", 1, 365*2, 365, 1);
-    settingsPanel.addRange("amount", 1, 1, 10, 1);
-    settingsPanel.addRange("start_price", 1, 1, 10, 1);
-    settingsPanel.addRange("money", 1, 200, 9, 1);
-    settingsPanel.addRange("max_portfolio_percentage", 1, 100, 20, 1);
-    settingsPanel.saveInLocalStorage("SETTINGS_STORAGE");
+      run();
+     }
 
-    run();
-   }
-
-   if (document.addEventListener) document.addEventListener("DOMContentLoaded", main, false);
-   else if (document.attachEvent) document.attachEvent("onreadystatechange", main);
-   else window.onload = autorun;
-  </script>
+     if (document.addEventListener) document.addEventListener("DOMContentLoaded", main, false);
+     else if (document.attachEvent) document.attachEvent("onreadystatechange", main);
+     else window.onload = autorun;
+    </script>
   </body>
 </html>
