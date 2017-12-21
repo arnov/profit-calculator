@@ -7,26 +7,33 @@
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
 
+    <style>
+      .winner {
+        border: 2px solid #018001;
+      }
+
+      .loser {
+        border: 2px solid #8c0e0e;
+      }
+    </style>
+
     <title></title>
   </head>
   <body>
     <div class="container">
+      <div id="chartContainer" style="margin-top: 25px; margin-left:70px;"></div>
+
       <div class="row">
-        <div id="chartContainer1" style="margin-top: 25px; margin-left:70px;" class="col-4"></div>
-        <div style="margin: 50px; margin-left:100px;">
-          <h4>Final value</h4>
-          <table class="table table-bordered" style="width: 500px;" class="col-4">
+        <div class="col-sm-6">
+          <h4>Strategy 1 - Final value</h4>
+          <table class="table table-bordered">
             <tbody id="table1">
             </tbody>
           </table>
         </div>
-      </div>
-
-      <div class="row">
-        <div id="chartContainer2" style="margin-top: 25px; margin-left:70px;"></div>
-        <div style="margin: 50px; margin-left:100px;">
-          <h4>Final value</h4>
-          <table class="table table-bordered" style="width: 400px;">
+        <div class="col-sm-6">
+          <h4>Strategy 2 - Final value</h4>
+          <table class="table table-bordered">
             <tbody id="table2">
             </tbody>
           </table>
@@ -42,15 +49,20 @@
       let settingsPanel;
       let reinitDelayId;
 
+      let times_run = 0;
+      let times_crashed = 0;
+
+      let final_values = {};
+
       function renderGraph(data, container_id){
         document.getElementById(container_id).innerHTML = "";
-        var svg = dimple.newSvg('#' + container_id, 500, 400);
+        var svg = dimple.newSvg('#' + container_id, 900, 500);
 
         var myChart = new dimple.chart(svg, data);
-        myChart.setBounds(60, 30, 505, 305);
+        myChart.setBounds(60, 30, 805, 405);
         myChart.addCategoryAxis("x", "Day");
         myChart.addMeasureAxis("y", "Value");
-        myChart.addLegend(100, 6, 60, 200, "Right");
+        myChart.addLegend(100, 6, 120, 200, "Right");
 
         var s = myChart.addSeries("Metric", dimple.plot.line);
         s.getTooltipText = function (e) {
@@ -65,50 +77,77 @@
       function renderTable(price, money, portfolio_value, total_value, days, container_id){
         let html = '';
         let data = [
-          {label: 'Day', value: days},
-          {label: 'Price', value: price.toFixed(2)},
+          {label: 'Total Value', value: total_value.toFixed(2)},
           {label: 'Money', value: money.toFixed(2)},
           {label: 'Portfolio Value', value: portfolio_value.toFixed(2)},
-          {label: 'Total Value', value: total_value.toFixed(2)},
+          {label: 'Price', value: price.toFixed(2)},
+          {label: 'Day', value: days}
         ]
         data.forEach(function(element) {
           html += '<tr><td>'+element.label+'</td><td>'+element.value+'</td></tr>'
         });
-        document.getElementById(container_id).innerHTML = html;
 
+        if ('2' in final_values){
+          if (final_values['1'] > final_values['2']){
+            $("#table1").addClass("winner");
+            $("#table2").addClass("loser");
+          } else if (final_values['1'] < final_values['2']){
+            $("#table2").addClass("winner");
+            $("#table1").addClass("loser");
+          } else {
+            $("#table2").removeClass();
+            $("#table1").removeClass();
+          }
+        }
+
+        document.getElementById(container_id).innerHTML = html;
       }
 
       function generateRandomNumber(min, max){
           return Math.random() * (max - min) + min;
       };
 
-      function dailyPriceAdjuctMent(price, yearly_interest) {
-        let dailyFluctuation = price * 0.05 * 0;
+      function dailyPriceAdjustment(price, yearly_interest) {
+        console.log('price before: ' + price)
+        let dailyFluctuation = price * 0.05 + 0.1;
         let dailyIncrease = yearly_interest ** (1/365);
+
+        if(times_crashed > 0){
+          dailyIncrease = 0;
+        }
 
         let min_increase = -0.5 * dailyFluctuation + (price * (dailyIncrease-1));
         let max_increase = 0.5 * dailyFluctuation + (price * (dailyIncrease-1));
 
         price += generateRandomNumber(min_increase, max_increase);
+        if(price < 0) {
+          price = 0;
+        }
+
+        if(times_run > 4 && times_crashed < 1 && Math.random() < 0.001){
+          console.log('crash!!')
+          times_crashed += 1;
+          price = price / 5;
+        }
+        console.log(price)
         return price;
       }
 
-      function run(){
+      function calculate_data(id, max_portfolio_percentage){
         let days = settingsPanel.getValue("days");
+        let price = settingsPanel.getValue("start_price");
+
         let amount = settingsPanel.getValue("amount");
         let money = settingsPanel.getValue("money");
-        let price = settingsPanel.getValue("start_price");
-        let max_portfolio_percentage = settingsPanel.getValue("max_portfolio_percentage");
+        let portfolio_value = price * amount;
+        let total_value = portfolio_value + money;
 
         let yearly_interest = 10; // times (e.g. 3 -> 3x value in one year)
         let max_overflow_percentage = 20;
 
-        let portfolio_value = price * amount;
-        let total_value = portfolio_value + money;
-
         let data = [];
         for (i = 0; i < days; i++) {
-          price = dailyPriceAdjuctMent(price, yearly_interest);
+          price = dailyPriceAdjustment(price, yearly_interest, times_crashed);
 
           portfolio_value = price * amount;
           total_value = portfolio_value + money;
@@ -121,43 +160,54 @@
             money = money + sale_amount * price;
           }
 
-        if((i % 10 == 0 && days < 500) || i % 20 == 0){
-          data.push({'Day': i, 'Value': price, 'Metric': 'Price'});
-          data.push({'Day': i, 'Value': money, 'Metric': 'Money'});
-          data.push({'Day': i, 'Value': portfolio_value, 'Metric': 'Portfolio'});
-          data.push({'Day': i, 'Value': total_value, 'Metric': 'Total'});
+          if((i % 10 == 0 && days < 500) || i % 20 == 0){
+            data.push({'Day': i, 'Value': price, 'Metric': 'Price'});
+            data.push({'Day': i, 'Value': money, 'Metric': 'Money - strategy ' + id});
+            data.push({'Day': i, 'Value': portfolio_value, 'Metric': 'Portfolio - strategy ' + id});
+            data.push({'Day': i, 'Value': total_value, 'Metric': 'Total - strategy ' + id});
+          }
         }
+
+        final_values[id] = total_value;
+
+        renderTable(price, money, portfolio_value, total_value, days, 'table' + id);
+        return data;
       }
 
-      renderTable(price, money, portfolio_value, total_value, days, 'table1');
-      renderGraph(data, 'chartContainer1');
+      function run(){
+        times_crashed = 0;
+        let data = calculate_data('1', settingsPanel.getValue("max_portfolio_percentage1"));
+        data = data.concat(calculate_data('2', settingsPanel.getValue("max_portfolio_percentage2")));
 
-      renderTable(price, money, portfolio_value, total_value, days, 'table2');
-      renderGraph(data, 'chartContainer2');
-    }
+        renderGraph(data, 'chartContainer');
+        times_run += 1;
+      }
 
-    function runDelayed() {
-        clearTimeout(reinitDelayId);
-        reinitDelayId = setTimeout(run, 200);
-    }
+      function runDelayed() {
+          clearTimeout(reinitDelayId);
+          reinitDelayId = setTimeout(run, 200);
+      }
 
-    function main(){
-      settingsPanel = QuickSettings.create(0, 0, "Settings (h to hide)");
-      settingsPanel.setKey("h");
-      settingsPanel.setGlobalChangeHandler(runDelayed);
-      settingsPanel.addRange("days", 1, 365*2, 365, 1);
-      settingsPanel.addRange("amount", 1, 10, 1, 1);
-      settingsPanel.addRange("start_price", 1, 10, 1, 1);
-      settingsPanel.addRange("money", 1, 500, 9, 1);
-      settingsPanel.addRange("max_portfolio_percentage", 1, 100, 20, 1);
-      settingsPanel.saveInLocalStorage("SETTINGS_STORAGE");
+      function main(){
+        settingsPanel = QuickSettings.create(0, 0, "Settings (h to hide)");
+        settingsPanel.setKey("h");
+        settingsPanel.setGlobalChangeHandler(runDelayed);
+        settingsPanel.addRange("days", 1, 365*2, 365, 1);
+        settingsPanel.addRange("amount", 1, 10, 1, 1);
+        settingsPanel.addRange("start_price", 1, 10, 1, 1);
+        settingsPanel.addRange("money", 1, 500, 9, 1);
 
-      run();
-     }
+        settingsPanel.addRange("max_portfolio_percentage1", 1, 100, 20, 1);
+        settingsPanel.addRange("max_portfolio_percentage2", 1, 100, 20, 1);
 
-     if (document.addEventListener) document.addEventListener("DOMContentLoaded", main, false);
-     else if (document.attachEvent) document.attachEvent("onreadystatechange", main);
-     else window.onload = autorun;
+        settingsPanel.saveInLocalStorage("SETTINGS_STORAGE");
+
+        run();
+       }
+
+       if (document.addEventListener) document.addEventListener("DOMContentLoaded", main, false);
+       else if (document.attachEvent) document.attachEvent("onreadystatechange", main);
+       else window.onload = autorun;
     </script>
   </body>
 </html>
